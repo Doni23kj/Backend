@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: backend
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python manage.py runserver 0.0.0.0:${PORT}"
+    repo: https://github.com/Doni23kj/Backend.git
+    branch: master
