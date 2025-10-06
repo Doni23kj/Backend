@@ -51,14 +51,25 @@ class UserProfile(models.Model):
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(default=timezone.now)
     avatar = models.URLField(blank=True, null=True, default='https://via.placeholder.com/150?text=Avatar')
+    avatar_file = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    bio = models.TextField(blank=True, null=True, max_length=500)
 
     def __str__(self):
         return f'{self.user.username} Profile'
+
+    def get_avatar_url(self):
+        """Возвращает URL аватара - либо загруженного файла, либо URL"""
+        if self.avatar_file:
+            return self.avatar_file.url
+        elif self.avatar:
+            return self.avatar
+        else:
+            return f'https://via.placeholder.com/150?text={self.user.username[0].upper()}'
 
     def save(self, *args, **kwargs):
         if self.is_online:
             self.last_seen = timezone.now()
         # Если аватар не задан, используем стандартный
         if not self.avatar:
-            self.avatar = 'https://via.placeholder.com/150?text=Avatar'
+            self.avatar = f'https://via.placeholder.com/150?text={self.user.username[0].upper()}'
         super().save(*args, **kwargs)

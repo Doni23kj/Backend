@@ -4,9 +4,29 @@ from .models import ChatRoom, Message, UserProfile
 
 
 class UserSerializer(serializers.ModelSerializer):
+    profile = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'date_joined', 'profile']
+        
+    def get_profile(self, obj):
+        try:
+            from chat.models import UserProfile
+            profile = obj.profile
+            return {
+                'is_online': profile.is_online,
+                'last_seen': profile.last_seen,
+                'avatar': profile.get_avatar_url(),
+                'bio': profile.bio
+            }
+        except UserProfile.DoesNotExist:
+            return {
+                'is_online': False,
+                'last_seen': None,
+                'avatar': f'https://via.placeholder.com/150?text={obj.username[0].upper()}',
+                'bio': None
+            }
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

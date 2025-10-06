@@ -110,7 +110,7 @@ def current_user(request):
     return Response(UserSerializer(request.user).data)
 
 
-@api_view(['GET', 'PUT'])
+@api_view(['GET', 'PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def profile_detail(request):
     """Получить или обновить профиль пользователя"""
@@ -118,7 +118,10 @@ def profile_detail(request):
         serializer = UserProfileDetailSerializer(request.user)
         return Response(serializer.data)
     
-    elif request.method == 'PUT':
+    elif request.method in ['PUT', 'PATCH']:
+        # Логируем входящие данные для отладки
+        print("Received data:", request.data)
+        
         # Обновляем основную информацию пользователя
         user_serializer = UserProfileUpdateSerializer(
             request.user, 
@@ -129,13 +132,6 @@ def profile_detail(request):
         if user_serializer.is_valid():
             user_serializer.save()
             
-            # Обновляем аватар в профиле, если передан
-            avatar = request.data.get('avatar')
-            if avatar is not None:
-                profile, created = UserProfile.objects.get_or_create(user=request.user)
-                profile.avatar = avatar
-                profile.save()
-            
             # Возвращаем обновленную информацию
             response_serializer = UserProfileDetailSerializer(request.user)
             return Response({
@@ -143,6 +139,8 @@ def profile_detail(request):
                 'message': 'Профиль успешно обновлен'
             })
         
+        # Логируем ошибки валидации
+        print("Validation errors:", user_serializer.errors)
         return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -241,3 +239,29 @@ def user_list(request):
         user_data.append(user_info)
     
     return Response({'users': user_data})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_avatar(request):
+    """Загрузка аватара пользователя"""
+    from .serializers import AvatarUploadSerializer
+    
+    print("Upload avatar request data:", request.data)  # Отладка
+    print("Upload avatar request files:", request.FILES)  # Отладка
+    
+    serializer = AvatarUploadSerializer(data=request.data, context={'request': request})
+    
+    if serializer.is_valid():
+        profile = serializer.save()
+        
+        # Возвращаем обновленную информацию о пользователе
+        user_serializer = UserProfileDetailSerializer(request.user)
+        
+        return Response({
+            'message': 'Аватар успешно обновлен',
+            'user': user_serializer.data
+        })
+    
+    print("Avatar upload validation errors:", serializer.errors)  # Отладка
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

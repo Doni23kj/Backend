@@ -48,7 +48,6 @@ class UserLoginSerializer(serializers.Serializer):
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     """Serializer для обновления профиля пользователя"""
-    avatar = serializers.URLField(required=False, allow_blank=True)
     
     class Meta:
         model = User
@@ -57,9 +56,34 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         """Проверяем уникальность email"""
         user = self.context['request'].user
+        
+        # Если email пустой, не проверяем уникальность
+        if not value or value.strip() == '':
+            return value
+            
         if User.objects.exclude(pk=user.pk).filter(email=value).exists():
             raise serializers.ValidationError("Пользователь с таким email уже существует")
         return value
+    
+    def update(self, instance, validated_data):
+        """Обновляем пользователя и его профиль"""
+        # Обновляем основные поля пользователя
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Извлекаем дополнительные данные из запроса
+        request_data = self.context['request'].data
+        bio = request_data.get('bio')
+        
+        # Обновляем профиль только если есть данные для обновления
+        if bio is not None:
+            profile, created = UserProfile.objects.get_or_create(user=instance)
+            profile.bio = bio
+            profile.save()
+            print(f"Updated profile bio: {bio}")  # Отладка
+        
+        return instance
 
 
 class UserProfileDetailSerializer(serializers.ModelSerializer):
@@ -77,13 +101,15 @@ class UserProfileDetailSerializer(serializers.ModelSerializer):
             return {
                 'is_online': profile.is_online,
                 'last_seen': profile.last_seen,
-                'avatar': profile.avatar
+                'avatar': profile.get_avatar_url(),
+                'bio': profile.bio or ''  # Добавляем bio
             }
         except UserProfile.DoesNotExist:
             return {
                 'is_online': False,
                 'last_seen': None,
-                'avatar': None
+                'avatar': f'https://via.placeholder.com/150?text={obj.username[0].upper()}',
+                'bio': ''  # Добавляем bio для случая, когда профиль не существует
             }
 
 
@@ -109,3 +135,39 @@ class ChangePasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data['new_password'])
         user.save()
         return user
+
+
+class AvatarUploadSerializer(serializers.Serializer):
+    """Serializer для загрузки аватара"""
+    avatar = serializers.ImageField(required=False)
+    avatar_url = serializers.URLField(required=False)
+    
+    def validate(self, data):
+        request = self.context['request']
+        # Проверяем наличие данных в FILES или в data
+        has_file = 'avatar' in request.FILES
+        has_url = 'avatar_url' in request.data and request.data['avatar_url'].strip()
+        
+        if not has_file and not has_url:
+            raise serializers.ValidationError("Необходимо указать либо файл аватара, либо URL")
+        return data
+    
+    def save(self):
+        user = self.context['request'].user
+        request = self.context['request']
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        
+        # Приоритет у загружаемого файла
+        if 'avatar' in request.FILES:
+            profile.avatar_file = request.FILES['avatar']
+            # Очищаем URL аватара, если загружаем файл
+            profile.avatar = ''
+            print(f"Uploaded avatar file: {profile.avatar_file}")
+        elif 'avatar_url' in request.data and request.data['avatar_url'].strip():
+            profile.avatar = request.data['avatar_url']
+            # Очищаем файл аватара, если задаём URL
+            profile.avatar_file = None
+            print(f"Set avatar URL: {profile.avatar}")
+        
+        profile.save()
+        return profile
