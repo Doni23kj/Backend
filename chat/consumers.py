@@ -217,3 +217,86 @@ class ChatConsumer(AsyncWebsocketConsumer):
             profile.save()
         except Exception as e:
             logger.error(f"Error updating user status: {e}")
+
+
+class GeneralChatConsumer(AsyncWebsocketConsumer):
+    """General chat consumer for connections without specific room_id"""
+    
+    async def connect(self):
+        self.user = self.scope['user']
+        
+        # Check authentication
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+            
+        # Join a general chat group
+        self.room_group_name = 'general_chat'
+        
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        
+        await self.accept()
+        
+        # Send status message
+        await self.send(text_data=json.dumps({
+            'type': 'connection_established',
+            'message': f'Connected to general chat as {self.user.username}',
+            'user': self.user.username
+        }))
+
+    async def disconnect(self, close_code):
+        # Leave room group
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+
+    async def receive(self, text_data):
+        try:
+            text_data_json = json.loads(text_data)
+            message_type = text_data_json.get('type', 'message')
+            
+            if message_type == 'ping':
+                # Respond to ping
+                await self.send(text_data=json.dumps({
+                    'type': 'pong',
+                    'timestamp': text_data_json.get('timestamp')
+                }))
+            elif message_type == 'message':
+                message = text_data_json.get('message', '')
+                
+                # Broadcast message to room group
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message': message,
+                        'username': self.user.username,
+                        'user_id': self.user.id,
+                    }
+                )
+                
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Invalid JSON'
+            }))
+        except Exception as e:
+            logger.error(f"Error in GeneralChatConsumer receive: {e}")
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Server error'
+            }))
+
+    async def chat_message(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'message',
+            'message': event['message'],
+            'username': event['username'],
+            'user_id': event['user_id'],
+        }))
