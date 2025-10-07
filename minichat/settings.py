@@ -31,7 +31,6 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -41,7 +40,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
-    'channels',
     'corsheaders',
     'chat',
     'accounts',
@@ -77,14 +75,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'minichat.wsgi.application'
-ASGI_APPLICATION = 'minichat.asgi.application'
 
 # Channels - InMemoryChannelLayer (без Redis)
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels.layers.InMemoryChannelLayer',
+#     },
+# }
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [

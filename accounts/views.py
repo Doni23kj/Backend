@@ -110,7 +110,7 @@ def current_user(request):
     return Response(UserSerializer(request.user).data)
 
 
-@api_view(['GET', 'PUT'])
+@api_view(['GET', 'PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def profile_detail(request):
     """Получить или обновить профиль пользователя"""
@@ -118,7 +118,7 @@ def profile_detail(request):
         serializer = UserProfileDetailSerializer(request.user)
         return Response(serializer.data)
     
-    elif request.method == 'PUT':
+    elif request.method in ['PUT', 'PATCH']:
         # Обновляем основную информацию пользователя
         user_serializer = UserProfileUpdateSerializer(
             request.user, 
